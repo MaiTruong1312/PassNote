@@ -4,6 +4,7 @@ import '../../viewmodels/dashboard_viewmodel.dart';
 import '../../utils/app_theme.dart';
 import '../components/add_password_sheet.dart';
 import '../components/password_details_sheet.dart';
+import '../../models/password_model.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
@@ -99,7 +100,7 @@ class HomeView extends StatelessWidget {
   }
 
   // WIDGET CHO TỪNG Ô MẬT KHẨU
-  Widget _buildPasswordItem(BuildContext context, Map<String, dynamic> item) {
+  Widget _buildPasswordItem(BuildContext context, Password item) {
     return GestureDetector(
       onTap: () => _showPasswordDetails(context, item),
       child: Container(
@@ -124,7 +125,7 @@ class HomeView extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Text(
-                item['app_name'].toString().toUpperCase(),
+                item.appName.toUpperCase(),
                 style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
@@ -161,7 +162,7 @@ class HomeView extends StatelessWidget {
     );
   }
 
-  void _showPasswordDetails(BuildContext context, Map<String, dynamic> item) {
+  void _showPasswordDetails(BuildContext context, Password item) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,

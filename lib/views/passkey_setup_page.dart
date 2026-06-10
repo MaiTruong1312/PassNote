@@ -70,10 +70,11 @@ class _PasskeySetupPageState extends State<PasskeySetupPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("SETUP PASSKEY"), centerTitle: true),
-      body: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Icon(Icons.security, size: 50, color: AppTheme.primaryBlack),
             const SizedBox(height: 40),
@@ -120,15 +121,22 @@ class _PasskeySetupPageState extends State<PasskeySetupPage> {
           ],
         ),
       ),
+      ),
     );
   }
 
   Future<void> _savePasskey(String pin) async {
     await SecureStorageService.savePasskey(pin);
     if (!mounted) return;
+    setState(() {
+      _hasExisting = true;
+      _isConfirming = false;
+      _pinController.clear();
+      _confirmPinController.clear();
+      _error = null;
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("PASSKEY SAVED SUCCESSFULLY"), behavior: SnackBarBehavior.floating),
     );
-    Navigator.pop(context);
   }
 }

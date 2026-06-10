@@ -1,7 +1,7 @@
 class UserModel {
   final String id;
   final String username;
-  final Map<String, dynamic> faceEncoding;
+  final dynamic faceEncoding;
 
   UserModel({required this.id, required this.username, required this.faceEncoding});
 

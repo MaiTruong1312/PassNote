@@ -30,6 +30,11 @@ android {
         versionName = flutter.versionName
     }
 
+    androidResources {
+        noCompress += "onnx"
+        noCompress += "isar"
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.

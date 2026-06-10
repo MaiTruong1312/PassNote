@@ -6,6 +6,7 @@ import '../../utils/app_theme.dart';
 import '../../services/secure_storage_service.dart';
 import '../passkey_setup_page.dart';
 import '../face_setup_page.dart';
+import '../../services/biometric_service.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -17,7 +18,9 @@ class SettingsView extends StatefulWidget {
 class _SettingsViewState extends State<SettingsView> {
   bool _usePasskey = true;
   bool _useFace = true;
+  bool _useFingerprint = false;
   bool _isLoading = true;
+  bool _isBiometricSupported = false;
 
   @override
   void initState() {
@@ -28,6 +31,8 @@ class _SettingsViewState extends State<SettingsView> {
   Future<void> _loadSettings() async {
     _usePasskey = await SecureStorageService.getUsePasskeyLogin();
     _useFace = await SecureStorageService.getUseFaceLogin();
+    _useFingerprint = await SecureStorageService.getUseFingerprintLogin();
+    _isBiometricSupported = await BiometricService.isBiometricAvailable();
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -65,19 +70,20 @@ class _SettingsViewState extends State<SettingsView> {
             title: "BIOMETRIC LOGIN",
             subtitle: "Use face recognition to access vault",
             value: _useFace,
-            onChanged: (v) async {
-              await SecureStorageService.setUseFaceLogin(v);
-              setState(() => _useFace = v);
-            },
+            onChanged: (v) => _handleToggle("face", v),
           ),
+          if (_isBiometricSupported)
+            _buildSwitchTile(
+              title: "FINGERPRINT LOGIN",
+              subtitle: "Use system biometrics (Fingerprint/FaceID)",
+              value: _useFingerprint,
+              onChanged: (v) => _handleToggle("fingerprint", v),
+            ),
           _buildSwitchTile(
             title: "PASSKEY ACCESS",
             subtitle: "Secondary 6-digit pin security",
             value: _usePasskey,
-            onChanged: (v) async {
-              await SecureStorageService.setUsePasskeyLogin(v);
-              setState(() => _usePasskey = v);
-            },
+            onChanged: (v) => _handleToggle("passkey", v),
           ),
           
           const SizedBox(height: 30),
@@ -92,7 +98,7 @@ class _SettingsViewState extends State<SettingsView> {
             title: "MANAGE FACE IDENTITY",
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FaceSetupPage())),
           ),
-          
+
           const SizedBox(height: 30),
           _sectionHeader("SYSTEM"),
           _buildListTile(
@@ -181,6 +187,131 @@ class _SettingsViewState extends State<SettingsView> {
         onTap: onTap,
       ),
     );
+  }
+
+  Widget _buildParamTile({required String title, required String subtitle, required Widget child}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black.withOpacity(0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                ],
+              ),
+              child,
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleToggle(String type, bool newValue) async {
+    final passwordController = TextEditingController();
+    bool confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        title: const Text("SECURITY VERIFICATION", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 2)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Enter your master password to confirm changes.", style: TextStyle(fontSize: 10, color: Colors.grey)),
+            const SizedBox(height: 15),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                hintText: "PASSWORD",
+                hintStyle: TextStyle(fontSize: 10, letterSpacing: 2),
+                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.black12)),
+                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.black)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("CANCEL", style: TextStyle(color: Colors.grey, fontSize: 10)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final creds = await SecureStorageService.getAccountCredentials();
+              if (creds['password'] == passwordController.text) {
+                Navigator.pop(context, true);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("INVALID PASSWORD", style: TextStyle(fontSize: 10, letterSpacing: 1)))
+                );
+              }
+            },
+            child: const Text("CONFIRM", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (confirmed) {
+      bool canEnable = true;
+      String? errorMessage;
+
+      if (newValue == true) {
+        if (type == "face") {
+          final faceData = await SecureStorageService.getFaceEncoding();
+          if (faceData == null || faceData.isEmpty) {
+            canEnable = false;
+            errorMessage = "Please register your Face Identity first.";
+          }
+        } else if (type == "passkey") {
+          final passkey = await SecureStorageService.getPasskey();
+          if (passkey == null || passkey.isEmpty) {
+            canEnable = false;
+            errorMessage = "Please configure your Security PIN first.";
+          }
+        }
+      }
+
+      if (canEnable) {
+        if (type == "face") {
+          await SecureStorageService.setUseFaceLogin(newValue);
+          setState(() => _useFace = newValue);
+        } else if (type == "fingerprint") {
+          await SecureStorageService.setUseFingerprintLogin(newValue);
+          setState(() => _useFingerprint = newValue);
+        } else if (type == "passkey") {
+          await SecureStorageService.setUsePasskeyLogin(newValue);
+          setState(() => _usePasskey = newValue);
+        }
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            title: const Text("DATA REQUIRED", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 2)),
+            content: Text(errorMessage ?? "Required data missing.", style: const TextStyle(fontSize: 10)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 
   void _showLogoutDialog(BuildContext context, DashboardViewModel viewModel) {

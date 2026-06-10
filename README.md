@@ -1,64 +1,98 @@
-# PassNote (Luxury Secure Vault) 🔐
+# 🔐 PassNote - Biometric Vault (Local-First)
 
-**PassNote** là một ứng dụng quản lý mật khẩu an toàn và cao cấp, được phát triển trên nền tảng **Flutter** kết hợp cơ sở dữ liệu **Supabase**. Ứng dụng tập trung vào bảo mật tối đa cho thông tin người dùng với sự kết hợp của chuẩn mã hóa AES tiên tiến và công nghệ xác thực sinh trắc học AI (DeepFace).
-
----
-
-## Tính năng nổi bật ✨
-
-- **Lưu trữ bảo mật đám mây:** Thêm, xem, ẩn/hiện, sao chép và xóa mật khẩu. Dữ liệu được quản trị qua Supabase.
-- **Mã hóa điểm-cuối (End-to-end Encryption):** Mọi mật khẩu được mã hóa bằng thuật toán `AES` với `IV` động ngay trên điện thoại trước khi đẩy lên Supabase. Không lấy được plaintext nếu chỉ truy cập cơ sở dữ liệu.
-- **Đăng nhập nhanh với Mã PIN (Passkey):** Thiết lập và sử dụng mã PIN 6 số để đăng nhập an toàn, tiện lợi thay vì nhập mật khẩu tài khoản (dùng `flutter_secure_storage`).
-- **Nhận diện khuôn mặt AI (Face Authentication):** Tích hợp công nghệ AI xác thực khuôn mặt từ `DeepFace` thông qua Máy chủ API Python độc lập, phát hiện và so sánh bằng thuật toán Cosine Distance.
-
-## Kiến trúc Hệ thống 🏗️
-
-1. **Frontend (Mobile App):** `Flutter` & `Provider`. Giao diện tối giản, sang trọng (Luxury Theme).
-2. **Backend Database:** `Supabase` PostgreSQL (lưu trữ mật khẩu mã hóa, lịch sử hệ thống `audit_log`, quản lý người dùng `users`,...).
-3. **Face API Server:** Server độc lập chạy bằng `Python (FastAPI)` tích hợp `DeepFace`, `OpenCV` để trích xuất cấu trúc đường nét khuôn mặt (embeddings vector).
+**PassNote** là ứng dụng quản lý mật khẩu bảo mật cao, kết hợp giữa kiến trúc **Local-First (ưu tiên dữ liệu cục bộ)** và xác thực sinh trắc học **Face AI (ArcFace)**. Ứng dụng đảm bảo dữ liệu luôn sẵn dụng ngay cả khi offline và tự động đồng bộ hóa an toàn với Supabase Cloud.
 
 ---
 
-## Hướng dẫn cài đặt & Khởi chạy 🚀
+## 🚀 Tính năng nổi bật
 
-### 1. Khởi chạy Máy chủ API Nhận diện Khuôn mặt (Face API Server)
-Để tính năng Face Login hoạt động, bạn cần khởi chạy Backend API.
+- 🗄️ **Local-First Architecture**: Sử dụng **Isar Database** siêu tốc để lưu trữ mật khẩu trên thiết bị. Load dữ liệu tức thì, không phụ thuộc mạng.
+- 🔄 **Background Sync**: Tự động đồng bộ hóa dữ liệu với **Supabase** khi có kết nối internet.
+- 🎭 **Face ID Authentication**: Xác thực bằng khuôn mặt sử dụng model **ArcFace** (Inference qua Server riêng để đảm bảo hiệu năng).
+- 🛡️ **AES-256 Encryption**: Mật khẩu được mã hóa cục bộ trước khi lưu vào database.
+- 🌙 **Luxury UI**: Giao diện hiện đại, sang trọng với các hiệu ứng micro-animation.
 
+---
+
+## 🛠️ Yêu cầu hệ thống
+
+- **Flutter SDK**: ^3.0.0
+- **Dart**: ^3.0.0
+- **Android**: API 21+ (Android 5.0 trở lên)
+- **Face AI Server**: Đang chạy model `arcface.onnx` (FastAPI/Python)
+
+---
+
+## 📦 Hướng dẫn cài đặt
+
+### 1. Clone Project
 ```bash
-cd face_api_server
-# Cài đặt các thư viện cần thiết
-pip install fastapi uvicorn deepface opencv-python numpy python-multipart
-# Chạy server ở cổng 8000
-python main.py
-```
-*(Lưu ý: Nếu bạn chạy ứng dụng Flutter trên thiết bị thật, hãy nhớ lấy địa chỉ IPv4 của máy tính và sửa `baseUrl` trong file `lib/services/face_api_service.dart`)*.
-
-### 2. Thiết lập Ứng dụng Flutter (Frontend)
-Đảm bảo bạn đã cài đặt [Flutter SDK](https://docs.flutter.dev/get-started/install).
-
-```bash
-# Clone dự án & di chuyển vào thư mục dự án
+git clone https://github.com/MaiTruong1312/PassNote.git
 cd PassNote
+```
 
-# Cài đặt các thư viện Dart/Flutter
+### 2. Cài đặt Dependencies
+```bash
 flutter pub get
+```
 
-# Chạy ứng dụng trên Emulator hoặc Thiết bị thật
-flutter run
+### 3. Sinh mã nguồn tự động (Quan trọng)
+Dự án sử dụng `build_runner` để sinh code cho Isar và các Model. Bạn **bắt buộc** phải chạy lệnh này nếu có thay đổi về Model:
+```bash
+dart run build_runner build --delete-conflicting-outputs
 ```
 
 ---
 
-## Hướng dẫn sử dụng cơ bản 📖
+## ⚙️ Cấu hình quan trọng
 
-1. **Đăng ký & Đăng nhập**: Tại màn hình chính, mở khóa Vault bằng cách Đăng nhập tài khoản Supabase. 
-2. **Bảo mật sinh trắc học & Passkey**: Truy cập vào `System Settings` -> `Setup Passkey` (Mã PIN 6 số) hoặc `Setup Face Recognition`. Điện thoại sẽ dùng Camera hoặc lưu mã hóa an toàn trên thiết bị của bạn.
-3. **Đăng nhập lần tiếp theo**: Ứng dụng sẽ ưu tiên hiển thị màn hình mở khóa nhanh (Face Scan / PIN code).
-4. **Quản lý Passwords**:
-   - Chạm vào nút (+) để thêm thông tin ứng dụng mới.
-   - Chạm vào ứng dụng trong Vault để mở khóa/hiển thị chi tiết (Có nút Copy Clipboard và con mắt (`•`) để ẩn hiện text).
-   - Biểu tượng 🗑️ (Thùng rác) ở góc trên để Xóa vĩnh viễn mật khẩu.
+### 1. Supabase Configuration
+Mở file `lib/main.dart` và cập nhật thông tin dự án Supabase của bạn:
+```dart
+await Supabase.initialize(
+  url: 'YOUR_SUPABASE_URL',
+  anonKey: 'YOUR_SUPABASE_ANON_KEY',
+);
+```
+
+### 2. Face AI Server
+Mở file `lib/services/face_api_service.dart` và cập nhật địa chỉ IP Server đang chạy model ArcFace:
+```dart
+static String get baseUrl {
+  return 'http://YOUR_SERVER_IP:8000'; 
+}
+```
 
 ---
 
-*Phát triển bởi đội ngũ tâm huyết, PassNote cam kết mang lại không gian lưu trữ thông tin số hóa an toàn và thẩm mỹ nhất.*
+## 📱 Chạy ứng dụng
+
+Để đảm bảo hiệu năng tốt nhất trên các dòng máy Android đời cao (Android 11-16), hãy làm theo các bước sau:
+
+1.  **Gỡ cài đặt** bản app cũ trên điện thoại (nếu có).
+2.  **Dọn dẹp build**:
+    ```bash
+    flutter clean
+    flutter pub get
+    ```
+3.  **Chạy ứng dụng**:
+    ```bash
+    flutter run
+    ```
+
+---
+
+## ⚠️ Lưu ý kỹ thuật
+
+### Lỗi ANR (App Not Responding)
+Nếu app bị treo ở logo, hãy kiểm tra:
+- Đảm bảo file `arcface.onnx` và `isar` được cấu hình `noCompress` trong `android/app/build.gradle.kts`.
+- Kiểm tra kết nối mạng giữa điện thoại và máy tính (ADB).
+
+### Gradle & AGP
+Dự án đã được cấu hình tối ưu với **AGP 8.11.1** và **Gradle 8.14**. Một đoạn script đặc biệt trong `android/build.gradle.kts` đã được thêm vào để xử lý lỗi `namespace` của thư viện Isar trên các phiên bản Android mới.
+
+---
+
+## 📝 Giấy phép
+Dự án được phát triển bởi **Antigravity AI Assistant** & **MaiTruong1312**.

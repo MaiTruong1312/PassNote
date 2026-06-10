@@ -1,0 +1,190 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.audit_log (
+  id bigint NOT NULL DEFAULT nextval('audit_log_id_seq'::regclass),
+  user_id uuid,
+  action_type character varying NOT NULL,
+  action_details jsonb,
+  ip_address inet,
+  user_agent text,
+  resource_type character varying,
+  resource_id uuid,
+  status character varying DEFAULT 'success'::character varying,
+  error_message text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT audit_log_pkey PRIMARY KEY (id),
+  CONSTRAINT audit_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.backup_codes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  code_hash character varying NOT NULL,
+  code_salt character varying NOT NULL,
+  is_used boolean DEFAULT false,
+  used_at timestamp with time zone,
+  used_ip inet,
+  generated_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone,
+  CONSTRAINT backup_codes_pkey PRIMARY KEY (id),
+  CONSTRAINT backup_codes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.encryption_keys (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  key_type character varying NOT NULL CHECK (key_type::text = ANY (ARRAY['master'::character varying, 'data'::character varying, 'backup'::character varying]::text[])),
+  encrypted_key text NOT NULL,
+  key_version integer DEFAULT 1,
+  key_algorithm character varying DEFAULT 'AES-256-GCM'::character varying,
+  salt character varying,
+  iterations integer DEFAULT 100000,
+  created_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone,
+  last_used timestamp with time zone,
+  is_active boolean DEFAULT true,
+  rotated_from uuid,
+  rotation_reason character varying,
+  CONSTRAINT encryption_keys_pkey PRIMARY KEY (id),
+  CONSTRAINT encryption_keys_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT encryption_keys_rotated_from_fkey FOREIGN KEY (rotated_from) REFERENCES public.encryption_keys(id)
+);
+CREATE TABLE public.face_dynamic_templates (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  encoding jsonb NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT face_dynamic_templates_pkey PRIMARY KEY (id),
+  CONSTRAINT face_dynamic_templates_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.face_templates (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  template_data jsonb NOT NULL,
+  template_version character varying,
+  template_type character varying CHECK (template_type::text = ANY (ARRAY['primary'::character varying, 'backup'::character varying, 'alternative'::character varying]::text[])),
+  model_name character varying NOT NULL,
+  embedding_dimension integer,
+  source_image_url text,
+  image_quality smallint CHECK (image_quality >= 0 AND image_quality <= 100),
+  lighting_condition character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  is_active boolean DEFAULT true,
+  match_count integer DEFAULT 0,
+  last_match_time timestamp with time zone,
+  avg_match_score numeric,
+  CONSTRAINT face_templates_pkey PRIMARY KEY (id),
+  CONSTRAINT face_templates_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.login_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  login_time timestamp with time zone DEFAULT now(),
+  login_method character varying CHECK (login_method::text = ANY (ARRAY['face'::character varying, 'password'::character varying, 'fingerprint'::character varying]::text[])),
+  login_status character varying CHECK (login_status::text = ANY (ARRAY['success'::character varying, 'failed'::character varying, 'blocked'::character varying]::text[])),
+  face_match_score numeric CHECK (face_match_score >= 0::numeric AND face_match_score <= 1::numeric),
+  face_confidence numeric CHECK (face_confidence >= 0::numeric AND face_confidence <= 1::numeric),
+  recognition_time_ms integer,
+  device_id character varying,
+  device_name character varying,
+  app_version character varying,
+  ip_address inet,
+  suspicious_activity boolean DEFAULT false,
+  failure_reason text,
+  risk_score smallint DEFAULT 0 CHECK (risk_score >= 0 AND risk_score <= 100),
+  CONSTRAINT login_history_pkey PRIMARY KEY (id),
+  CONSTRAINT login_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.password_categories (
+  id integer NOT NULL DEFAULT nextval('password_categories_id_seq'::regclass),
+  user_id uuid NOT NULL,
+  category_name character varying NOT NULL,
+  category_icon character varying,
+  color_code character varying CHECK (color_code::text ~ '^#[0-9A-Fa-f]{6}$'::text),
+  sort_order integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT password_categories_pkey PRIMARY KEY (id),
+  CONSTRAINT password_categories_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.password_sharing (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  password_id uuid NOT NULL,
+  shared_with_user_id uuid NOT NULL,
+  shared_by_user_id uuid NOT NULL,
+  permission_level character varying DEFAULT 'view'::character varying CHECK (permission_level::text = ANY (ARRAY['view'::character varying, 'edit'::character varying, 'admin'::character varying]::text[])),
+  access_token character varying,
+  expires_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  last_accessed timestamp with time zone,
+  access_count integer DEFAULT 0,
+  CONSTRAINT password_sharing_pkey PRIMARY KEY (id),
+  CONSTRAINT password_sharing_password_id_fkey FOREIGN KEY (password_id) REFERENCES public.passwords(id),
+  CONSTRAINT password_sharing_shared_with_user_id_fkey FOREIGN KEY (shared_with_user_id) REFERENCES public.users(id),
+  CONSTRAINT password_sharing_shared_by_user_id_fkey FOREIGN KEY (shared_by_user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.passwords (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  app_name character varying NOT NULL,
+  app_username character varying NOT NULL,
+  app_url character varying,
+  app_icon character varying,
+  encrypted_password text NOT NULL,
+  iv character varying NOT NULL,
+  encryption_key_id uuid,
+  password_strength smallint DEFAULT 0 CHECK (password_strength >= 0 AND password_strength <= 100),
+  category_id integer,
+  notes text,
+  tags ARRAY,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  last_used timestamp with time zone,
+  expires_at timestamp with time zone,
+  is_favorite boolean DEFAULT false,
+  is_deleted boolean DEFAULT false,
+  access_count integer DEFAULT 0,
+  last_accessed_ip inet,
+  CONSTRAINT passwords_pkey PRIMARY KEY (id),
+  CONSTRAINT passwords_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  session_token character varying NOT NULL UNIQUE,
+  refresh_token character varying NOT NULL UNIQUE,
+  device_id character varying,
+  device_name character varying,
+  ip_address inet,
+  user_agent text,
+  expires_at timestamp with time zone NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  last_activity timestamp with time zone DEFAULT now(),
+  is_revoked boolean DEFAULT false,
+  CONSTRAINT sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.user_settings (
+  user_id uuid NOT NULL,
+  settings jsonb NOT NULL DEFAULT '{"ui": {"theme": "system", "language": "en"}, "backup": {"frequency": "weekly", "auto_backup": false}, "security": {"auto_lock_timeout": 5, "max_login_attempts": 5, "require_face_for_sensitive": true}, "notifications": {"email": true, "login_alerts": true, "password_expiry_alerts": true}, "face_recognition": {"threshold": 0.5, "require_liveness": true}}'::jsonb,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_settings_pkey PRIMARY KEY (user_id),
+  CONSTRAINT user_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  username character varying NOT NULL UNIQUE,
+  email character varying UNIQUE,
+  full_name character varying,
+  face_encoding jsonb NOT NULL,
+  face_image_url text,
+  face_template_version character varying,
+  two_factor_enabled boolean DEFAULT false,
+  backup_face_encoding jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  last_login timestamp with time zone,
+  is_active boolean DEFAULT true,
+  registered_device_id character varying,
+  registered_device_name character varying,
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);

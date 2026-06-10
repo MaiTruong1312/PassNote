@@ -7,7 +7,10 @@ import 'viewmodels/register_viewmodel.dart';
 import 'viewmodels/dashboard_viewmodel.dart';
 import 'viewmodels/add_password_viewmodel.dart';
 import 'views/login_page.dart';
+import 'views/login_page.dart';
 import 'views/dashboard_page.dart';
+import 'services/local_db_service.dart';
+import 'services/face_inference_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +20,6 @@ void main() async {
     url: 'https://ndibzehsrtcyugmhjowm.supabase.co',
     anonKey: 'sb_publishable_ZKJOHeeA0Sd-VcHIjtMapw_B3oc4OKj',
   );
-
   runApp(
     MultiProvider(
       providers: [
@@ -29,6 +31,14 @@ void main() async {
       child: const VaultApp(),
     ),
   );
+
+  // KHỞI TẠO DATABASE (Giữ Isar vì nó nhẹ và ổn định)
+  LocalDatabaseService().init().then((_) {
+    debugPrint("SYSTEM: Local Database (Isar) ready.");
+  });
+
+  // TẠM DỪNG AI OFFLINE - Chuyển sang dùng Face API Server
+  // FaceInferenceService().init(); 
 }
 
 class VaultApp extends StatelessWidget {

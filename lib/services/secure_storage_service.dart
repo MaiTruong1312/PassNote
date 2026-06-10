@@ -11,6 +11,13 @@ class SecureStorageService {
   
   static const _keyUsePasskeyLogin = 'use_passkey_login';
   static const _keyUseFaceLogin = 'use_face_login';
+  static const _keyUseFingerprintLogin = 'use_fingerprint_login';
+  static const _keyFaceThreshold = 'face_threshold';
+  static const _keyCameraRotation = 'camera_rotation';
+  static const _keyFaceScanInterval = 'face_scan_interval';
+  static const _keyFaceScanCount = 'face_scan_count';
+  static const _keyDynamicTemplates = 'dynamic_face_templates';
+  static const _keyMultiViewAnchors = 'multi_view_face_anchors';
 
   // --- Login Preferences ---
   static Future<void> setUsePasskeyLogin(bool val) async => await _storage.write(key: _keyUsePasskeyLogin, value: val.toString());
@@ -18,6 +25,16 @@ class SecureStorageService {
 
   static Future<void> setUseFaceLogin(bool val) async => await _storage.write(key: _keyUseFaceLogin, value: val.toString());
   static Future<bool> getUseFaceLogin() async => (await _storage.read(key: _keyUseFaceLogin)) != 'false';
+
+  static Future<void> setUseFingerprintLogin(bool val) async => await _storage.write(key: _keyUseFingerprintLogin, value: val.toString());
+  static Future<bool> getUseFingerprintLogin() async => (await _storage.read(key: _keyUseFingerprintLogin)) == 'true';
+
+  static Future<void> setFaceThreshold(double val) async => await _storage.write(key: _keyFaceThreshold, value: val.toString());
+  static Future<double> getFaceThreshold() async {
+    final val = await _storage.read(key: _keyFaceThreshold);
+    if (val == null) return 0.65; 
+    return double.tryParse(val) ?? 0.65;
+  }
 
   // --- Passkey Management ---
   static Future<void> savePasskey(String pin) async {
@@ -64,5 +81,25 @@ class SecureStorageService {
   static Future<void> clearFaceEncoding() async {
     await _storage.write(key: _keyFaceEncoding, value: '');
     await _storage.delete(key: _keyFaceEncoding);
+    await _storage.delete(key: _keyDynamicTemplates);
+    await _storage.delete(key: _keyMultiViewAnchors); // Vá lỗi: Xóa bộ mỏ neo đa góc độ local
+  }
+
+  // --- Dynamic Templates Management ---
+  static Future<void> saveDynamicTemplates(String json) async {
+    await _storage.write(key: _keyDynamicTemplates, value: json);
+  }
+
+  static Future<String?> getDynamicTemplates() async {
+    return await _storage.read(key: _keyDynamicTemplates);
+  }
+
+  // --- Multi-view Anchors Management ---
+  static Future<void> saveMultiViewAnchors(String json) async {
+    await _storage.write(key: _keyMultiViewAnchors, value: json);
+  }
+
+  static Future<String?> getMultiViewAnchors() async {
+    return await _storage.read(key: _keyMultiViewAnchors);
   }
 }

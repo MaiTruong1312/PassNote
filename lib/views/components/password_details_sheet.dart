@@ -8,11 +8,13 @@ import '../../utils/app_theme.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
-import '../../services/face_api_service.dart';
+
+import '../../services/face_inference_service.dart';
 import '../../services/secure_storage_service.dart';
+import '../../models/password_model.dart';
 
 class PasswordDetailsSheet extends StatefulWidget {
-  final Map<String, dynamic> item;
+  final Password item;
 
   const PasswordDetailsSheet({super.key, required this.item});
 
@@ -30,8 +32,8 @@ class _PasswordDetailsSheetState extends State<PasswordDetailsSheet> {
     super.initState();
     try {
       _decryptedPassword = EncryptionService.decryptPassword(
-          widget.item['encrypted_password'],
-          widget.item['iv']
+          widget.item.encryptedPassword,
+          widget.item.iv
       );
     } catch (e) {
       debugPrint("Decrypt error: $e");
@@ -56,7 +58,7 @@ class _PasswordDetailsSheetState extends State<PasswordDetailsSheet> {
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext); // close dialog
-              bool success = await viewModel.deletePassword(widget.item['id']);
+              bool success = await viewModel.deletePassword(widget.item.supabaseId, widget.item.localId);
               if (success && mounted) {
                 innerNavigator.pop(); // close bottom sheet
                 scaffoldMessenger.showSnackBar(
@@ -90,15 +92,18 @@ class _PasswordDetailsSheetState extends State<PasswordDetailsSheet> {
        
        if (pickedFile == null) return false;
 
-       final vector = await FaceApiService.extractFace(File(pickedFile.path));
+       final vector = await FaceInferenceService().extractEmbedding(File(pickedFile.path));
        if (vector != null) {
-         final List<double> savedEncoding = List<double>.from(jsonDecode(savedStr));
-         double distance = FaceApiService.calculateCosineDistance(vector, savedEncoding);
-         if (distance < 0.40) return true;
-         scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Face mismatch! Access Denied.")));
-         return false;
+          final List<double> savedEncoding = List<double>.from(jsonDecode(savedStr));
+          double distance = FaceInferenceService.calculateCosineDistance(vector, savedEncoding);
+          debugPrint("Face distance (Local Sheet): $distance");
+          
+          final threshold = await SecureStorageService.getFaceThreshold();
+          if (distance < threshold) return true;
+          scaffoldMessenger.showSnackBar(SnackBar(content: Text("Face mismatch! (Dist: ${distance.toStringAsFixed(3)})")));
+          return false;
        } else {
-         scaffoldMessenger.showSnackBar(const SnackBar(content: Text("NO FACE DETECTED OR SERVER ERROR.")));
+         scaffoldMessenger.showSnackBar(const SnackBar(content: Text("SERVER ERROR OR NO FACE DETECTED.")));
          return false;
        }
      } finally {
@@ -122,14 +127,14 @@ class _PasswordDetailsSheetState extends State<PasswordDetailsSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(widget.item['app_name'].toUpperCase(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 2)),
+              Text(widget.item.appName.toUpperCase(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 2)),
               IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: _confirmDelete),
             ],
           ),
           const SizedBox(height: 10),
           const Divider(color: Colors.black, thickness: 2),
           const SizedBox(height: 20),
-          _infoRow("USERNAME", widget.item['app_username']),
+          _infoRow("USERNAME", widget.item.appUsername),
           const SizedBox(height: 15),
           
           Column(
@@ -149,7 +154,7 @@ class _PasswordDetailsSheetState extends State<PasswordDetailsSheet> {
                   IconButton(
                     icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
                     onPressed: _isAuthenticating ? null : () async {
-                      if (_obscurePassword && widget.item['is_favorite'] == true) {
+                      if (_obscurePassword && widget.item.isFavorite == true) {
                          bool authSuccess = await _promptFaceAuth();
                          if (!authSuccess && mounted) return; 
                       }

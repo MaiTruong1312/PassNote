@@ -16,21 +16,31 @@ dependencies:
   http: ^1.6.0
   camera: ^0.12.0+1
   intl: ^0.20.2
+  onnxruntime: 1.4.1
+  image: 4.2.0
+  supabase_flutter: ^2.0.0
+  isar: ^3.1.0+1
+  isar_flutter_libs: ^3.1.0+1
+  path_provider: ^2.1.2
+  google_mlkit_face_detection: ^0.13.2
+  local_auth: ^2.3.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   provider: ^6.1.2
   google_fonts: ^6.2.1
-  supabase_flutter: ^2.0.0
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.13.1
-
+  isar_generator: ^3.1.0+1
+  build_runner: ^2.4.8
+  analyzer: ^5.13.0
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/icon.png
+    - assets/model/arcface.onnx
 
 flutter_launcher_icons:
   android: "launcher_icon"
